@@ -1,72 +1,224 @@
-// Функция короткого тактильного отклика (Пункт 4)
-function vibrateShort() { if (navigator.vibrate) navigator.vibrate(50); }
-
-searchInput.addEventListener('input', function() {
-    let val = this.value.toLowerCase().trim().replace(/['"`]/g, '').replace('окэй', 'окей');
-    if (/^\d+$/.test(val) && isTechMode) { isTechMode = false; document.querySelectorAll('.truck-chip').forEach(el => el.classList.remove('active')); const allBtn = document.querySelector('[data-city="all"]'); if (allBtn) allBtn.classList.add('active'); }
-    renderCards(); autocompleteList.innerHTML = ''; if (!val) { autocompleteList.classList.add('hidden'); return; }
-    const searchWords = val.split(/\s+/).filter(w => w.length > 0); let suggestions = [];
-    
-    if (isTechMode) {
-        suggestions = (onlineTechStations.length > 0 ? onlineTechStations : techStations).filter(station => { const fullText = `${station.type} ${station.name}${station.address} ${station.desc \vert{}\vert{} ''}${station.city || ''}`.toLowerCase(); return searchWords.every(word => fullText.includes(word)); });
-        if (suggestions.length > 0) { 
-            autocompleteList.classList.remove('hidden'); 
-            suggestions.slice(0, 20).forEach(item => { 
-                const div = document.createElement('div'); 
-                div.className = 'px-4 py-3 hover:bg-orange-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-none transition-colors mx-1 my-0.5 text-gray-800 dark:text-gray-200'; 
-                div.innerHTML = getDropdownItemHTML(item, true); 
-                div.addEventListener('click', () => { 
-                    playTickSound(); 
-                    vibrateShort(); // Вибрация
-                    searchInput.value = item.name; 
-                    autocompleteList.classList.add('hidden'); 
-                    searchInput.blur(); // Скрываем клавиатуру (Пункт 3)
-                    renderCards(); 
-                }); 
-                autocompleteList.appendChild(div); 
-            }); 
-        } else autocompleteList.classList.add('hidden');
-    } else {
-        suggestions = stores.filter(store => { 
-            let brandName = "ЛЕНТА"; if (store.address.includes("ОКЕЙ") || store.tk === "929929") brandName = "ОКЕЙ"; else if (store.address.includes("Молл")) brandName = "РЦ МОЛЛ"; else if (store.address.includes("Монетка") || (store.tk.startsWith("92") && store.tk.length > 3)) brandName = "МОНЕТКА"; 
-            const cleanAddressTextSearch = store.address.replace(/\b\d{6}\b,?\s*/g, ''); const fullText = `тк ${store.tk} рц ${store.tk}${store.city} ${cleanAddressTextSearch}${brandName}`.toLowerCase().replace(/['"`]/g, ''); 
-            const matchesSearch = searchWords.every(word => { if (/^\d+$/.test(word)) return store.tk === word || new RegExp(`\\b${word}\\b`).test(cleanAddressTextSearch.toLowerCase()); return fullText.includes(word); }); 
-            let matchesFilter = true; if (selectedCityFilter !== 'all' && store.city !== selectedCityFilter) matchesFilter = false; return matchesSearch && matchesFilter; 
-        });
-        if (suggestions.length > 0) { 
-            autocompleteList.classList.remove('hidden'); 
-            suggestions.slice(0, 20).forEach(store => { 
-                const item = document.createElement('div'); 
-                item.className = 'px-4 py-3 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer border-b border-gray-50 dark:border-slate-700 last:border-none transition-colors mx-1 my-0.5 text-gray-800 dark:text-gray-200'; 
-                item.innerHTML = getDropdownItemHTML(store, false); 
-                item.addEventListener('click', () => { 
-                    playTickSound(); 
-                    vibrateShort(); // Вибрация
-                    searchInput.value = store.tk !== '-' ? store.tk : store.city; 
-                    autocompleteList.classList.add('hidden'); 
-                    searchInput.blur(); // Скрываем клавиатуру (Пункт 3)
-                    renderCards(); 
-                }); 
-                autocompleteList.appendChild(item); 
-            }); 
-        } else autocompleteList.classList.add('hidden');
-    }
-});
-
-document.addEventListener('click', function(e) { if (!searchInput.contains(e.target) && !autocompleteList.contains(e.target)) { autocompleteList.classList.add('hidden'); } });
-
-window.startVoiceSearch = function() {
-    const micBtn = document.getElementById('voiceSearchBtn'); const searchInput = document.getElementById('searchInput'); const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SpeechRecognition) { showToast("Голосовой поиск не поддерживается 🎙"); return; }
-    try { 
-        const recognition = new SpeechRecognition(); 
-        recognition.lang = 'ru-RU'; recognition.interimResults = false; recognition.maxAlternatives = 1; 
-        recognition.onstart = function() { micBtn.classList.add('mic-listening'); micBtn.classList.remove('text-lentaBlue', 'dark:text-blue-400'); searchInput.value = ''; searchInput.placeholder = "Слушаю вас..."; }; 
-        recognition.onresult = function(event) { let speechResult = event.results[0][0].transcript.toLowerCase(); speechResult = speechResult.replace(/\bсто\b/gi, '100').replace(/\bдвести\b/gi, '200').replace(/\bтриста\b/gi, '300').replace(/\.$/, '').trim(); searchInput.value = speechResult; searchInput.dispatchEvent(new Event('input')); }; 
-        recognition.onerror = function() { resetMic(); searchInput.placeholder = "Повторите запрос..."; }; 
-        recognition.onend = function() { resetMic(); }; 
-        function resetMic() { micBtn.classList.remove('mic-listening'); micBtn.classList.add('text-lentaBlue', 'dark:text-blue-400'); searchInput.placeholder = "Поиск..."; } 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Авто-Сборщик Кода</title>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: #121212; color: #ffffff; margin: 0; padding: 15px; display: flex; flex-direction: column; height: 100vh; }
+        h2 { margin: 0 0 10px 0; font-size: 20px; text-align: center; color: #4caf50; }
+        .stats { display: flex; justify-content: space-between; background: #1e1e1e; padding: 12px 15px; border-radius: 10px; margin-bottom: 12px; font-size: 15px; border: 1px solid #333; }
+        .stats span { font-weight: bold; color: #4caf50; font-size: 17px; }
         
-        vibrateShort(); // Вибрация при включении микрофона
-        recognition.start(); 
-    } catch (e) { resetMic(); }
-};
+        .radar-btn { background: #263238; color: #b0bec5; border: 2px solid #37474f; padding: 18px; font-size: 18px; font-weight: bold; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .radar-btn.active { background: #1b5e20; color: #ffffff; border-color: #4caf50; box-shadow: 0 0 18px rgba(76, 175, 80, 0.5); animation: pulse 2s infinite; }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
+            50% { box-shadow: 0 0 22px rgba(76, 175, 80, 0.8); }
+            100% { box-shadow: 0 0 10px rgba(76, 175, 80, 0.4); }
+        }
+
+        .hint { font-size: 12px; color: #9e9e9e; text-align: center; margin-bottom: 10px; line-height: 1.4; }
+        textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; border: 1px solid #333; border-radius: 10px; padding: 12px; font-family: monospace; font-size: 13px; resize: none; margin-bottom: 12px; outline: none; }
+        textarea:focus { border-color: #4caf50; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .btn { padding: 14px; font-size: 15px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; color: white; }
+        .btn-undo { background: #f57c00; }
+        .btn-clear { background: #d32f2f; }
+        .filename-box { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .filename-box input { flex: 1; background: #1e1e1e; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; }
+        .btn-download { background: #1976d2; padding: 18px; font-size: 18px; width: 100%; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); }
+        .toast { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: #2e7d32; color: #fff; padding: 10px 22px; border-radius: 25px; font-size: 15px; font-weight: bold; opacity: 0; transition: 0.25s; pointer-events: none; border: 1px solid #81c784; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <h2>📡 Авто-Сборщик Кода</h2>
+
+    <div class="stats">
+        <div>Кусочков: <span id="chunkCount">0</span></div>
+        <div>Строк: <span id="lineCount">0</span></div>
+        <div>Символов: <span id="charCount">0</span></div>
+    </div>
+
+    <button id="radarBtn" class="radar-btn" onclick="toggleRadar()">
+        🔴 АВТО-ПЕРЕХВАТ ВЫКЛЮЧЕН (НАЖМИ)
+    </button>
+
+    <div class="hint" id="hintText">
+        Нажми кнопку выше, чтобы включить авто-слежение за буфером обмена. Дубликаты пропускаются автоматически!
+    </div>
+
+    <textarea id="codeArea" placeholder="Здесь автоматически собирается твой код..." oninput="manualUpdate()"></textarea>
+
+    <div class="controls">
+        <button class="btn btn-undo" onclick="undoLast()">↩️ Отменить шаг</button>
+        <button class="btn btn-clear" onclick="clearAll()">🗑️ Очистить всё</button>
+    </div>
+
+    <div class="filename-box">
+        <input type="text" id="fileName" value="index.html" placeholder="Имя файла">
+    </div>
+
+    <button class="btn btn-download" onclick="downloadFile()">💾 СКАЧАТЬ ГОТОВЫЙ ФАЙЛ</button>
+
+    <div id="toast" class="toast">Кусочек добавлен!</div>
+
+    <script>
+        let chunks = [];
+        let lastCapturedText = "";
+        let radarActive = false;
+        let radarInterval = null;
+
+        const codeArea = document.getElementById('codeArea');
+        const chunkCount = document.getElementById('chunkCount');
+        const lineCount = document.getElementById('lineCount');
+        const charCount = document.getElementById('charCount');
+        const toast = document.getElementById('toast');
+        const radarBtn = document.getElementById('radarBtn');
+        const hintText = document.getElementById('hintText');
+
+        window.onload = () => {
+            const saved = localStorage.getItem('savedChunks');
+            if (saved) {
+                chunks = JSON.parse(saved);
+                if (chunks.length > 0) {
+                    lastCapturedText = chunks[chunks.length - 1];
+                }
+                updateUI();
+            }
+        };
+
+        async function toggleRadar() {
+            radarActive = !radarActive;
+            if (radarActive) {
+                radarBtn.classList.add('active');
+                radarBtn.innerText = '🟢 РАДАР АКТИВЕН: ЖДУ КОПИРОВАНИЯ...';
+                hintText.innerText = 'Копируй код в другом окне и просто возвращайся/касайся сюда — новый кусок приклеится сам!';
+                await checkClipboard(true);
+                radarInterval = setInterval(() => checkClipboard(false), 800);
+            } else {
+                radarBtn.classList.remove('active');
+                radarBtn.innerText = '🔴 АВТО-ПЕРЕХВАТ ВЫКЛЮЧЕН (НАЖМИ)';
+                hintText.innerText = 'Нажми кнопку выше, чтобы включить авто-слежение за буфером обмена.';
+                clearInterval(radarInterval);
+            }
+        }
+
+        async function checkClipboard(isManualTrigger = false) {
+            if (!radarActive) return;
+            try {
+                const text = await navigator.clipboard.readText();
+                if (!text || !text.trim()) return;
+
+                // Проверка: если этот кусок уже был добавлен последним или вообще есть в списке точно такой же подряд
+                if (text === lastCapturedText) {
+                    return; // Молча игнорируем дубликат!
+                }
+
+                // Дополнительная проверка: вдруг этот кусок уже есть где-то в собранных кусках
+                if (chunks.includes(text)) {
+                    lastCapturedText = text;
+                    showToast('⚠️ Этот кусок уже есть в списке (пропущен)');
+                    return;
+                }
+
+                chunks.push(text);
+                lastCapturedText = text;
+                saveAndRefresh();
+                
+                // Короткая вибрация на телефоне при успешном захвате
+                if (navigator.vibrate) navigator.vibrate(60);
+                
+                showToast(`✅ Авто-вставка: кусок #${chunks.length}`);
+                codeArea.scrollTop = codeArea.scrollHeight;
+            } catch (err) {
+                // Если браузер потерял фокус, просто ждем возвращения фокуса
+                if (isManualTrigger) {
+                    showToast('⚠️ Разреши доступ к буферу обмена в браузере');
+                }
+            }
+        }
+
+        // Авто-проверка буфера при возвращении в окно, переключении вкладки или любом касании экрана
+        window.addEventListener('focus', () => checkClipboard(false));
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) checkClipboard(false);
+        });
+        document.body.addEventListener('touchstart', () => checkClipboard(false), { passive: true });
+        document.body.addEventListener('click', () => checkClipboard(false));
+
+        function manualUpdate() {
+            chunks = codeArea.value ? [codeArea.value] : [];
+            lastCapturedText = chunks.length > 0 ? chunks[chunks.length - 1] : "";
+            localStorage.setItem('savedChunks', JSON.stringify(chunks));
+            updateStats(codeArea.value);
+        }
+
+        function undoLast() {
+            if (chunks.length > 0) {
+                chunks.pop();
+                lastCapturedText = chunks.length > 0 ? chunks[chunks.length - 1] : "";
+                saveAndRefresh();
+                showToast('↩️ Последний кусок удален');
+            } else {
+                showToast('Нечего отменять');
+            }
+        }
+
+        function clearAll() {
+            if (chunks.length > 0 && confirm('Босс, точно очистить весь собранный код?')) {
+                chunks = [];
+                lastCapturedText = "";
+                saveAndRefresh();
+                showToast('🗑️ Всё очищено');
+            }
+        }
+
+        function saveAndRefresh() {
+            localStorage.setItem('savedChunks', JSON.stringify(chunks));
+            updateUI();
+        }
+
+        function updateUI() {
+            const fullText = chunks.join('\n');
+            codeArea.value = fullText;
+            updateStats(fullText);
+        }
+
+        function updateStats(text) {
+            chunkCount.innerText = chunks.length;
+            charCount.innerText = text.length;
+            lineCount.innerText = text ? text.split('\n').length : 0;
+        }
+
+        function downloadFile() {
+            const fullText = codeArea.value;
+            if (!fullText) {
+                showToast('⚠️ Код пустой, нечего скачивать!');
+                return;
+            }
+            const fileName = document.getElementById('fileName').value.trim() || 'index.html';
+            const blob = new Blob([fullText], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`🎉 Файл ${fileName} скачан!`);
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+    </script>
+</body>
+</html>
