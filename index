@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Сборщик Кода</title>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: #121212; color: #ffffff; margin: 0; padding: 15px; display: flex; flex-direction: column; height: 100vh; }
+        h2 { margin: 0 0 10px 0; font-size: 20px; text-align: center; color: #4caf50; }
+        .stats { display: flex; justify-content: space-between; background: #1e1e1e; padding: 12px 15px; border-radius: 10px; margin-bottom: 12px; font-size: 15px; border: 1px solid #333; }
+        .stats span { font-weight: bold; color: #4caf50; font-size: 17px; }
+        .btn-paste { background: #2e7d32; color: white; border: none; padding: 22px; font-size: 20px; font-weight: bold; border-radius: 12px; margin-bottom: 12px; cursor: pointer; active: scale(0.98); box-shadow: 0 4px 15px rgba(46, 125, 50, 0.4); transition: 0.15s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-paste:active { transform: scale(0.97); background: #1b5e20; }
+        textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; border: 1px solid #333; border-radius: 10px; padding: 12px; font-family: monospace; font-size: 13px; resize: none; margin-bottom: 12px; outline: none; }
+        textarea:focus { border-color: #4caf50; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .btn { padding: 14px; font-size: 15px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; color: white; }
+        .btn-undo { background: #f57c00; }
+        .btn-clear { background: #d32f2f; }
+        .filename-box { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .filename-box input { flex: 1; background: #1e1e1e; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; }
+        .btn-download { background: #1976d2; padding: 18px; font-size: 18px; width: 100%; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); }
+        .toast { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: #323232; color: #fff; padding: 10px 20px; border-radius: 25px; font-size: 14px; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #555; z-index: 100; }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <h2>🧩 Сборщик Кода</h2>
+
+    <div class="stats">
+        <div>Кусочков: <span id="chunkCount">0</span></div>
+        <div>Строк: <span id="lineCount">0</span></div>
+        <div>Символов: <span id="charCount">0</span></div>
+    </div>
+
+    <button class="btn-paste" onclick="pasteChunk()">
+        ➕ ВСТАВИТЬ КУСОК ИЗ БУФЕРА
+    </button>
+
+    <textarea id="codeArea" placeholder="Здесь будет собираться твой код... Можно также вставлять или редактировать вручную." oninput="manualUpdate()"></textarea>
+
+    <div class="controls">
+        <button class="btn btn-undo" onclick="undoLast()">↩️ Отменить шаг</button>
+        <button class="btn btn-clear" onclick="clearAll()">🗑️ Очистить всё</button>
+    </div>
+
+    <div class="filename-box">
+        <input type="text" id="fileName" value="index.html" placeholder="Имя файла">
+    </div>
+
+    <button class="btn btn-download" onclick="downloadFile()">💾 СКАЧАТЬ ГОТОВЫЙ ФАЙЛ</button>
+
+    <div id="toast" class="toast">Кусочек добавлен!</div>
+
+    <script>
+        let chunks = [];
+        const codeArea = document.getElementById('codeArea');
+        const chunkCount = document.getElementById('chunkCount');
+        const lineCount = document.getElementById('lineCount');
+        const charCount = document.getElementById('charCount');
+        const toast = document.getElementById('toast');
+
+        window.onload = () => {
+            const saved = localStorage.getItem('savedChunks');
+            if (saved) {
+                chunks = JSON.parse(saved);
+                updateUI();
+            }
+        };
+
+        async function pasteChunk() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (!text) {
+                    showToast('⚠️ Буфер обмена пуст!');
+                    return;
+                }
+                if (chunks.length > 0 && chunks[chunks.length - 1] === text) {
+                    if (!confirm('Этот кусок один в один совпадает с предыдущим! Точно добавить его еще раз?')) {
+                        return;
+                    }
+                }
+                chunks.push(text);
+                saveAndRefresh();
+                showToast(`✅ Кусок #${chunks.length} приклеен!`);
+                codeArea.scrollTop = codeArea.scrollHeight;
+            } catch (err) {
+                showToast('⚠️ Нажми на поле ниже и вставь вручную, либо разреши доступ к буферу');
+            }
+        }
+
+        function manualUpdate() {
+            chunks = codeArea.value ? [codeArea.value] : [];
+            localStorage.setItem('savedChunks', JSON.stringify(chunks));
+            updateStats(codeArea.value);
+        }
+
+        function undoLast() {
+            if (chunks.length > 0) {
+                chunks.pop();
+                saveAndRefresh();
+                showToast('↩️ Последний кусок удален');
+            } else {
+                showToast('Нечего отменять');
+            }
+        }
+
+        function clearAll() {
+            if (chunks.length > 0 && confirm('Босс, точно очистить весь собранный код?')) {
+                chunks = [];
+                saveAndRefresh();
+                showToast('🗑️ Всё очищено');
+            }
+        }
+
+        function saveAndRefresh() {
+            localStorage.setItem('savedChunks', JSON.stringify(chunks));
+            updateUI();
+        }
+
+        function updateUI() {
+            const fullText = chunks.join('\n');
+            codeArea.value = fullText;
+            updateStats(fullText);
+        }
+
+        function updateStats(text) {
+            chunkCount.innerText = chunks.length;
+            charCount.innerText = text.length;
+            lineCount.innerText = text ? text.split('\n').length : 0;
+        }
+
+        function downloadFile() {
+            const fullText = codeArea.value;
+            if (!fullText) {
+                showToast('⚠️ Код пустой, нечего скачивать!');
+                return;
+            }
+            const fileName = document.getElementById('fileName').value.trim() || 'index.html';
+            const blob = new Blob([fullText], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`🎉 Файл ${fileName} скачан!`);
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2200);
+        }
+    </script>
+</body>
+</html>
