@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Авто-Сборщик Кода</title>
 
-    <!-- 📲 NEW: PWA / установка на телефон -->
+    <!-- PWA / установка на телефон -->
     <meta name="theme-color" content="#4caf50">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -32,35 +32,50 @@
         .hint { font-size: 12px; color: #9e9e9e; text-align: center; margin-bottom: 10px; line-height: 1.4; }
         textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; border: 1px solid #333; border-radius: 10px; padding: 12px; font-family: monospace; font-size: 13px; resize: none; margin-bottom: 12px; outline: none; }
         textarea:focus { border-color: #4caf50; }
+
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         .btn { padding: 14px; font-size: 15px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; color: white; }
         .btn-undo { background: #f57c00; }
         .btn-clear { background: #d32f2f; }
-        .filename-box { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
-        .filename-box input { flex: 1; background: #1e1e1e; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; }
-        .btn-download { background: #1976d2; padding: 18px; font-size: 18px; width: 100%; box-shadow: 0 4px 15px rgba(25, 118, 210, 0.4); }
 
-        /* 📲 NEW: стили кнопки установки */
-        .btn-install {
+        /* Поле имени файла + компактная кнопка скачивания */
+        .filename-box { display: flex; gap: 8px; margin-bottom: 10px; align-items: stretch; }
+        .filename-box input { flex: 1; background: #1e1e1e; border: 1px solid #333; color: white; padding: 12px; border-radius: 10px; font-size: 16px; outline: none; }
+        .btn-dl {
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0 18px;
+            font-size: 22px;
+            cursor: pointer;
+            flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(25, 118, 210, 0.4);
+            transition: 0.15s;
+        }
+        .btn-dl:active { transform: scale(0.95); }
+
+        /* Компактная кнопка установки */
+        .btn-install-compact {
             background: linear-gradient(135deg, #7b1fa2, #4a148c);
-            padding: 16px;
-            font-size: 16px;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
             width: 100%;
             margin-bottom: 10px;
-            box-shadow: 0 4px 15px rgba(123, 31, 162, 0.4);
-            border: none;
-            color: white;
-            font-weight: bold;
-            border-radius: 10px;
-            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(123, 31, 162, 0.3);
             transition: 0.2s;
         }
-        .btn-install.ready-to-install {
+        .btn-install-compact.ready-to-install {
             background: linear-gradient(135deg, #66bb6a, #2e7d32);
             animation: pulse 2s infinite;
         }
 
-        /* 📲 NEW: модальное окно с инструкциями */
+        /* Модальное окно с инструкциями */
         .install-modal {
             display: none;
             position: fixed;
@@ -82,22 +97,12 @@
             max-height: 90vh;
             overflow-y: auto;
         }
-        .install-modal-content h3 {
-            color: #4caf50;
-            margin-top: 0;
-            text-align: center;
-            font-size: 18px;
-        }
-        .install-modal-content ol {
-            padding-left: 22px;
-            line-height: 1.7;
-            color: #d4d4d4;
-            font-size: 14px;
-        }
+        .install-modal-content h3 { color: #4caf50; margin-top: 0; text-align: center; font-size: 18px; }
+        .install-modal-content ol { padding-left: 22px; line-height: 1.7; color: #d4d4d4; font-size: 14px; }
         .install-modal-content ol li { margin-bottom: 6px; }
         .install-modal-content p { color: #d4d4d4; font-size: 14px; }
 
-        .toast { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: #2e7d32; color: #fff; padding: 10px 22px; border-radius: 25px; font-size: 15px; font-weight: bold; opacity: 0; transition: 0.25s; pointer-events: none; border: 1px solid #81c784; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .toast { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); background: #2e7d32; color: #fff; padding: 10px 22px; border-radius: 25px; font-size: 15px; font-weight: bold; opacity: 0; transition: 0.25s; pointer-events: none; border: 1px solid #81c784; z-index: 300; box-shadow: 0 4px 12px rgba(0,0,0,0.5); max-width: 90vw; text-align: center; }
         .toast.show { opacity: 1; }
     </style>
 </head>
@@ -128,18 +133,16 @@
 
     <div class="filename-box">
         <input type="text" id="fileName" value="index.html" placeholder="Имя файла">
+        <button class="btn-dl" onclick="downloadFile()" title="Сохранить собранный код">💾</button>
     </div>
 
-    <!-- 📲 NEW: кнопка установки приложения -->
-    <button class="btn-install" id="installBtn" onclick="installApp()">
-        📲 УСТАНОВИТЬ ПРИЛОЖЕНИЕ НА ТЕЛЕФОН
+    <button class="btn-install-compact" id="installBtn" onclick="installApp()">
+        📲 Установить на телефон
     </button>
-
-    <button class="btn btn-download" onclick="downloadFile()">💾 СКАЧАТЬ ГОТОВЫЙ ФАЙЛ</button>
 
     <div id="toast" class="toast">Кусочек добавлен!</div>
 
-    <!-- 📲 NEW: модальное окно с инструкциями по установке -->
+    <!-- Модальное окно с инструкциями по установке -->
     <div id="installModal" class="install-modal" onclick="if(event.target===this) closeInstallModal()">
         <div class="install-modal-content">
             <h3>📲 Как установить приложение</h3>
@@ -154,9 +157,8 @@
     </div>
 
     <script>
-        // 📲 NEW: PWA — динамическое создание манифеста и иконки
+        /* ============== PWA: манифест и иконка ============== */
         (function initPWA() {
-            // Генерация иконки-радара через canvas
             function generateIcon(size, maskable = false) {
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
@@ -168,7 +170,6 @@
                 const padding = maskable ? size * 0.18 : size * 0.08;
                 const maxR = size / 2 - padding;
 
-                // Концентрические кольца радара
                 [[0.35, 0.5], [0.55, 0.7], [0.78, 0.85], [0.95, 1]].forEach(([r, op]) => {
                     ctx.beginPath();
                     ctx.arc(cx, cy, maxR * r, 0, Math.PI * 2);
@@ -177,7 +178,6 @@
                     ctx.stroke();
                 });
 
-                // Луч
                 ctx.beginPath();
                 ctx.moveTo(cx, cy);
                 ctx.lineTo(cx + maxR * 0.95, cy - maxR * 0.4);
@@ -185,7 +185,6 @@
                 ctx.lineWidth = Math.max(2, size * 0.04);
                 ctx.stroke();
 
-                // Центральная точка
                 ctx.beginPath();
                 ctx.arc(cx, cy, Math.max(3, size * 0.055), 0, Math.PI * 2);
                 ctx.fillStyle = '#4caf50';
@@ -194,7 +193,6 @@
                 return canvas.toDataURL('image/png');
             }
 
-            // Манифест
             try {
                 const manifest = {
                     name: "Авто-Сборщик Кода",
@@ -220,7 +218,6 @@
                 manifestLink.setAttribute('data-pwa-dynamic', 'true');
                 document.head.appendChild(manifestLink);
 
-                // Apple touch icon (для iOS)
                 const appleIcon = document.createElement('link');
                 appleIcon.rel = 'apple-touch-icon';
                 appleIcon.href = generateIcon(180);
@@ -231,7 +228,7 @@
             }
         })();
 
-        // 📲 NEW: обработка установки
+        /* ============== Установка ============== */
         let deferredPrompt = null;
 
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -239,7 +236,7 @@
             deferredPrompt = e;
             const btn = document.getElementById('installBtn');
             btn.classList.add('ready-to-install');
-            btn.textContent = '✅ УСТАНОВИТЬ (ГОТОВО — НАЖМИ)';
+            btn.textContent = '✅ УСТАНОВИТЬ — НАЖМИ';
         });
 
         async function installApp() {
@@ -253,11 +250,10 @@
                     btn.textContent = '✅ ПРИЛОЖЕНИЕ УСТАНОВЛЕНО';
                     showToast('🎉 Приложение установлено!');
                 } else {
-                    btn.textContent = '📲 УСТАНОВИТЬ ПРИЛОЖЕНИЕ НА ТЕЛЕФОН';
+                    btn.textContent = '📲 Установить на телефон';
                 }
                 return;
             }
-            // Fallback: показать инструкции
             showInstallModal();
         }
 
@@ -308,31 +304,18 @@
             document.getElementById('installModal').classList.remove('show');
         }
 
-        // 📲 NEW: скачивание самого приложения (чистая копия HTML)
-        function downloadAppFile() {
+        /* Скачивание самого приложения (чистая копия HTML) */
+        async function downloadAppFile() {
             const cloned = document.documentElement.cloneNode(true);
-
-            // Удаляем динамически добавленные элементы
             cloned.querySelectorAll('[data-pwa-dynamic]').forEach(el => el.remove());
             cloned.querySelector('#installModal')?.classList.remove('show');
-
-            // Очищаем textarea, чтобы новое приложение стартовало пустым
             cloned.querySelectorAll('textarea').forEach(el => { el.value = ''; el.textContent = ''; });
 
             const html = '<!DOCTYPE html>\n' + cloned.outerHTML;
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'kod-sborschik.html';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showToast('📥 Файл скачан — откройте его на телефоне в Chrome');
+            await saveOrShareFile(html, 'kod-sborschik.html', 'text/html');
         }
 
-        // ===== Ниже — оригинальная логика (без изменений) =====
+        /* ============== Основная логика ============== */
         let chunks = [];
         let lastCapturedText = "";
         let radarActive = false;
@@ -349,7 +332,10 @@
         window.onload = () => {
             const saved = localStorage.getItem('savedChunks');
             if (saved) {
-                chunks = JSON.parse(saved);
+                try {
+                    chunks = JSON.parse(saved);
+                    if (!Array.isArray(chunks)) chunks = [];
+                } catch (e) { chunks = []; }
                 if (chunks.length > 0) {
                     lastCapturedText = chunks[chunks.length - 1];
                 }
@@ -448,6 +434,12 @@
             lineCount.innerText = text ? text.split('\n').length : 0;
         }
 
-        function downloadFile() {
-            const fullText = codeArea.value;
-            
+        /* ============== Универсальное сохранение файла ============== */
+        async function saveOrShareFile(text, fileName, mimeType) {
+            // 1. Web Share API (Android — откроется меню "Куда сохранить")
+            if (navigator.share && navigator.canShare && typeof File !== 'undefined') {
+                try {
+                    const file = new File([text], fileName, { type: mimeType });
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({ files: [file], title: fileName });
+                        sho
